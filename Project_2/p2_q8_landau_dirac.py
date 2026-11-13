@@ -132,7 +132,7 @@ def plot(fname):
     ax.text(0.97, 0.04,
             "parabolic band, Berry phase $\\gamma_B=0$\n"
             r"$\varepsilon_n=-4+4\pi b\,(n+\frac{1}{2})$: equal spacing, offset $\frac{1}{2}$" "\n"
-            r"every level (subband) has $C=-1$",
+            r"at $b=1/q$ each level has $C=-1$",
             transform=ax.transAxes, ha="right", va="bottom", fontsize=8.5,
             bbox=dict(facecolor="white", edgecolor="0.7", pad=3))
     # (b) near half flux
@@ -160,7 +160,7 @@ def plot(fname):
             "two Dirac cones at $b=1/2$,\nBerry phase $\\gamma_B=\\pi$\n"
             r"$\varepsilon_n=\pm4\sqrt{\pi n\,|b-\frac{1}{2}|}$" "\n"
             r"$\sqrt{n}$ spacing, zero mode" "\n"
-            r"every level has $C=+2$" "\n(one per cone)",
+            r"at $b=M/(2M+1)$ each" "\n" r"level has $C=+2$ (one per cone)",
             transform=ax.transAxes, ha="center", va="bottom", fontsize=8.5,
             bbox=dict(facecolor="white", edgecolor="0.7", pad=3))
     handles = [Line2D([], [], color="k", marker=".", lw=0.8,
