@@ -85,8 +85,10 @@ def landau_check():
         print(f"(e) b=1/{q}: subband centres {c.round(4)}, Landau levels {ll.round(4)}")
 
 
-def butterfly(qmax=60, fname="../images/fig_q2_butterfly_square.png"):
-    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10, 4.6),
+def butterfly(qmax=60, fname=None):
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.5, 4.8),
                                   gridspec_kw={"width_ratios": [1.35, 1]})
     for q in range(1, qmax + 1):
         for p in range(0, q + 1):
@@ -96,28 +98,54 @@ def butterfly(qmax=60, fname="../images/fig_q2_butterfly_square.png"):
             for lo, hi in band_edges(p, q):
                 ax.plot([lo, hi], [b, b], color="k", lw=0.5 if q < 20 else 0.35,
                         solid_capstyle="butt")
+    # guide marks
+    ax.axhline(1 / 3, color="#2a6fbb", lw=1.0, ls="--", alpha=0.9)
+    ax.text(3.95, 1 / 3 + 0.012, r"$b=1/3$: 3 subbands, see (b)", color="#2a6fbb",
+            fontsize=8, ha="right", bbox=dict(facecolor="white", edgecolor="none", pad=0.5))
+    ax.annotate(r"$b=1/2$: two Dirac cones" "\n" r"(bands touch at $\varepsilon=0$)",
+                xy=(0, 0.5), xytext=(1.3, 0.53), fontsize=8, color="#d1495b",
+                arrowprops=dict(arrowstyle="->", color="#d1495b", lw=0.8),
+                bbox=dict(facecolor="white", edgecolor="none", pad=0.5))
+    ax.annotate("Landau-level fans\n(small $b$, band edges)", xy=(-3.28, 0.125),
+                xytext=(-3.95, 0.25), fontsize=8, color="0.25",
+                arrowprops=dict(arrowstyle="->", color="0.35", lw=0.8),
+                bbox=dict(facecolor="white", edgecolor="none", pad=0.5))
+    ax.text(-3.95, 0.975, r"symmetric under $\varepsilon\to-\varepsilon$" "\n" r"and $b\to1-b$",
+            ha="left", va="top", fontsize=8, color="0.3")
     ax.set_xlabel(r"energy $\varepsilon$ (units of $|t|$)")
     ax.set_ylabel(r"flux per plaquette $b=p/q$ (units of $\Phi_0$)")
     ax.set_xlim(-4.1, 4.1); ax.set_ylim(0, 1)
-    ax.set_title(r"(a) Square-lattice Hofstadter butterfly, $q\leq%d$" % qmax, fontsize=10)
+    ax.set_title(r"(a) Hofstadter butterfly: $q$ subbands at every $b=p/q$, $q\leq%d$" % qmax,
+                 fontsize=10)
 
     # (b) Chambers polynomial for b = 1/3
     p, q = 1, 3
     e = np.linspace(-4.2, 4.2, 2000)
     P = np.array([np.linalg.det(x * np.eye(q) - H_mag(p, q, 0, 0)).real
                   + 4 for x in e])
-    ax2.plot(e, P, color="#2a6fbb", lw=1.6, label=r"$P_{1/3}(\varepsilon)$")
+    ax2.axhspan(-4, 4, color="#2a6fbb", alpha=0.07, zorder=0)
+    ax2.plot(e, P, color="#2a6fbb", lw=1.6)
     ax2.axhline(4, color="0.4", ls="--", lw=1); ax2.axhline(-4, color="0.4", ls="--", lw=1)
-    for lo, hi in band_edges(p, q):
-        ax2.axvspan(lo, hi, color="0.85", zorder=0)
+    for n, (lo, hi) in enumerate(band_edges(p, q)):
+        ax2.axvspan(lo, hi, color="0.8", zorder=0)
+        ax2.text(0.5 * (lo + hi), -11.3, f"band {n+1}", ha="center", fontsize=8)
     ax2.set_ylim(-12, 12); ax2.set_xlim(-4.2, 4.2)
-    ax2.set_xlabel(r"energy $\varepsilon$"); ax2.set_ylabel(r"$P_{1/3}(\varepsilon)$")
-    ax2.text(-4.0, 4.6, r"$+4$", fontsize=9, color="0.3")
-    ax2.text(-4.0, -5.6, r"$-4$", fontsize=9, color="0.3")
-    ax2.set_title(r"(b) Chambers polynomial, $b=1/3$", fontsize=10)
-    ax2.legend(loc="lower right", fontsize=9, frameon=False)
+    ax2.set_xlabel(r"energy $\varepsilon$"); ax2.set_ylabel(r"$P_{1/3}(\varepsilon)=\varepsilon^3-6\varepsilon$")
+    ax2.text(-4.1, 4.5, r"$P=+4$", fontsize=8, color="0.3")
+    ax2.text(-4.1, -5.4, r"$P=-4$", fontsize=8, color="0.3")
+    ax2.set_title(r"(b) allowed energies at $b=1/3$: $|P_{1/3}(\varepsilon)|\leq4$", fontsize=10)
+    ax2.legend(handles=[Line2D([], [], color="#2a6fbb", lw=1.6, label=r"Chambers polynomial $P_{1/3}$"),
+                        Patch(color="0.8", label=r"subbands (where $|P|\leq4$)")],
+               loc="upper left", fontsize=8, frameon=False)
     fig.tight_layout()
+    if fname is None:
+        import os
+        here = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(here) if os.path.basename(here).lower() in ("images", "codes") else here
+        os.makedirs(os.path.join(root, "images"), exist_ok=True)
+        fname = os.path.join(root, "images", "fig_q2_butterfly_square.png")
     fig.savefig(fname, dpi=300)
+    plt.close(fig)
     print("saved", fname)
 
 

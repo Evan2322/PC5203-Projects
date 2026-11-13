@@ -91,46 +91,85 @@ def checks():
         print(f"    {lab}: gamma_B = {g:+.4f}  (|gamma_B|/pi = {abs(g)/np.pi:.4f})")
 
 
-def zoom(ax, bmin, bmax, emin, emax, qmax=120):
-    """Subbands as segments; also a dot at each centre, since at small |b - b0| the
-    subbands are exponentially narrow and a bare segment would be invisible."""
-    xs, ys = [], []
+def subbands(bmin, bmax, emin, emax, qmax):
+    """(b, lo, hi) of every subband of every coprime p/q (q <= qmax) inside the window."""
+    out = []
     for q in range(1, qmax + 1):
         for p in range(0, q + 1):
             if gcd(p, q) != 1 or not (bmin <= p / q <= bmax):
                 continue
             for lo, hi in band_edges(p, q):
-                if hi < emin or lo > emax:
-                    continue
-                ax.plot([lo, hi], [p / q, p / q], color="k", lw=0.6, solid_capstyle="butt")
-                xs.append(0.5 * (lo + hi)); ys.append(p / q)
-    ax.plot(xs, ys, "k.", ms=1.2)
-    ax.set_xlim(emin, emax); ax.set_ylim(bmin, bmax)
+                if hi >= emin and lo <= emax:
+                    out.append((p / q, lo, hi))
+    return np.array(out)
+
+
+def draw(ax, sb):
+    for b, lo, hi in sb:
+        ax.plot([lo, hi], [b, b], color="k", lw=0.7, solid_capstyle="butt")
+    ax.plot(0.5 * (sb[:, 1] + sb[:, 2]), sb[:, 0], "k.", ms=1.6)
 
 
 def plot(fname):
-    fig, axs = plt.subplots(1, 2, figsize=(10, 4.4), constrained_layout=True)
-    # (a) band bottom
-    zoom(axs[0], 0.0, 0.12, -4.0, -2.4)
-    b = np.linspace(1e-4, 0.12, 200)
-    for n in range(5):
-        axs[0].plot(-4 + 4 * np.pi * b * (n + 0.5), b, color="#2a6fbb", lw=1.0, alpha=0.8,
-                    label=r"$-4+4\pi b\,(n+1/2)$" if n == 0 else None)
-    axs[0].set_xlabel(r"$\varepsilon$"); axs[0].set_ylabel(r"$b=p/q$")
-    axs[0].set_title(r"(a) band bottom: ordinary Landau levels, each $C=-1$", fontsize=10)
-    axs[0].legend(fontsize=8, frameon=False, loc="upper right")
+    from matplotlib.lines import Line2D
+    fig, axs = plt.subplots(1, 2, figsize=(10.5, 4.9), constrained_layout=True)
+    blue, red = "#2a6fbb", "#d1495b"
+    # (a) band bottom, small b
+    ax = axs[0]
+    bmax, emin, emax = 0.05, -4.0, -3.2
+    draw(ax, subbands(0.0, bmax, emin, emax, 160))
+    b = np.linspace(0, bmax, 200)
+    for n in range(4):
+        e = -4 + 4 * np.pi * b * (n + 0.5)
+        ax.plot(e, b, color=blue, lw=1.3, ls="--")
+        bt = min(bmax, (emax + 0.02 - (-4)) / (4 * np.pi * (n + 0.5)))   # label where the line leaves
+        ax.text(-4 + 4 * np.pi * bt * (n + 0.5) - 0.015, bt - 0.001, rf"$n={n}$",
+                color=blue, fontsize=9, ha="right", va="top",
+                bbox=dict(facecolor="white", edgecolor="none", pad=0.8))
+    ax.set_xlim(emin, emax); ax.set_ylim(0, bmax)
+    ax.set_xlabel(r"energy $\varepsilon$"); ax.set_ylabel(r"flux per plaquette $b=p/q$")
+    ax.set_title(r"(a) band bottom: ordinary Landau levels", fontsize=10.5)
+    ax.text(0.97, 0.04,
+            "parabolic band, Berry phase $\\gamma_B=0$\n"
+            r"$\varepsilon_n=-4+4\pi b\,(n+\frac{1}{2})$: equal spacing, offset $\frac{1}{2}$" "\n"
+            r"every level (subband) has $C=-1$",
+            transform=ax.transAxes, ha="right", va="bottom", fontsize=8.5,
+            bbox=dict(facecolor="white", edgecolor="0.7", pad=3))
     # (b) near half flux
-    zoom(axs[1], 0.40, 0.50, -1.8, 1.8)
-    b = np.linspace(0.40, 0.4999, 300)
+    ax = axs[1]
+    bmin, emax = 0.45, 1.3
+    draw(ax, subbands(bmin, 0.5, -emax, emax, 160))
+    b = np.linspace(bmin, 0.5, 400)
     d = 0.5 - b
-    for n in range(0, 4):
+    for n in range(4):
         e = 4 * np.sqrt(np.pi * n * d)
-        lab = r"$\pm4\sqrt{\pi n\,|b-1/2|}$" if n == 1 else None
-        axs[1].plot(e, b, color="#d1495b", lw=1.0, alpha=0.8, label=lab)
-        axs[1].plot(-e, b, color="#d1495b", lw=1.0, alpha=0.8)
-    axs[1].set_xlabel(r"$\varepsilon$"); axs[1].set_ylabel(r"$b=p/q$")
-    axs[1].set_title(r"(b) near $b=1/2$: Dirac Landau levels, each $C=+2$", fontsize=10)
-    axs[1].legend(fontsize=8, frameon=False, loc="lower right")
+        ax.plot(e, b, color=red, lw=1.3, ls="--")
+        ax.plot(-e, b, color=red, lw=1.3, ls="--")
+        if n > 0:
+            bt = max(bmin, 0.5 - (emax - 0.03) ** 2 / (16 * np.pi * n))
+            et = 4 * np.sqrt(np.pi * n * (0.5 - bt))
+            kw = dict(color=red, fontsize=9, va="bottom",
+                      bbox=dict(facecolor="white", edgecolor="none", pad=0.8))
+            ax.text(et - 0.06, bt + 0.0015, rf"$n={n}$", ha="right", **kw)
+            ax.text(-et + 0.06, bt + 0.0015, rf"$n=-{n}$", ha="left", **kw)
+    ax.text(0.03, bmin + 0.002, r"$n=0$" "\n(zero mode)", color=red, fontsize=9, ha="left")
+    ax.set_xlim(-emax, emax); ax.set_ylim(bmin, 0.5)
+    ax.set_xlabel(r"energy $\varepsilon$"); ax.set_ylabel(r"flux per plaquette $b=p/q$")
+    ax.set_title(r"(b) near half flux $b=1/2$: Dirac Landau levels", fontsize=10.5)
+    ax.text(0.27, 0.03,
+            "two Dirac cones at $b=1/2$,\nBerry phase $\\gamma_B=\\pi$\n"
+            r"$\varepsilon_n=\pm4\sqrt{\pi n\,|b-\frac{1}{2}|}$" "\n"
+            r"$\sqrt{n}$ spacing, zero mode" "\n"
+            r"every level has $C=+2$" "\n(one per cone)",
+            transform=ax.transAxes, ha="center", va="bottom", fontsize=8.5,
+            bbox=dict(facecolor="white", edgecolor="0.7", pad=3))
+    handles = [Line2D([], [], color="k", marker=".", lw=0.8,
+                      label=r"numerical subbands, all $p/q$ with $q\leq160$ (segment + centre dot)"),
+               Line2D([], [], color=blue, ls="--", lw=1.3, label=r"ordinary Landau levels, $n=0..3$"),
+               Line2D([], [], color=red, ls="--", lw=1.3, label=r"Dirac Landau levels, $n=0,\pm1,\pm2,\pm3$")]
+    fig.legend(handles=handles, loc="outside lower center", ncol=3, fontsize=8.5, frameon=False)
+    fig.suptitle("Same weak field, two kinds of Landau levels: the zero-field Berry phase of the "
+                 "lattice band decides which", fontsize=10.5)
     fig.savefig(fname, dpi=300)
     plt.close(fig)
     print("saved", fname)

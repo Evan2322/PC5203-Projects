@@ -136,10 +136,28 @@ def fixed_k_bands():
     print(f"(d) fixed-k band edges satisfy P(eps) = 2cos(qk) +- 2: max deviation {worst:.1e}")
 
 
+def crossings(ks, E, X, Eref):
+    """List of (k, sign, edge) for every eigenvalue crossing Eref (same rules as flow())."""
+    out = []
+    n = (E < Eref).sum(1)
+    for i in range(len(ks) - 1):
+        dn = n[i + 1] - n[i]
+        if dn == 0:
+            continue
+        j, sgn = (n[i] - 1, +1) if dn == -1 else (n[i], -1)
+        # interpolate the crossing momentum
+        e0, e1 = E[i, j], E[i + 1, j if dn == -1 else n[i]]
+        t = 0.5 if e1 == e0 else np.clip((Eref - e0) / (e1 - e0), 0, 1)
+        out.append((ks[i] + t * (ks[i + 1] - ks[i]), sgn, "L" if X[i, j] < 0.5 else "R"))
+    return out
+
+
 def plot(fname):
+    from matplotlib.lines import Line2D
     cases = [(1, 3, 31), (2, 5, 41)]
-    fig, axs = plt.subplots(1, 2, figsize=(10, 4.4), constrained_layout=True)
-    for ax, (p, q, L) in zip(axs, cases):
+    fig, axs = plt.subplots(1, 2, figsize=(10.5, 4.9), constrained_layout=True)
+    cL, cR = plt.get_cmap("coolwarm")(0.0), plt.get_cmap("coolwarm")(1.0)
+    for ax, (p, q, L), tag in zip(axs, cases, "ab"):
         b = p / q
         ks, E, X = sweep(L, b, 600)
         K = np.repeat(ks[:, None], L, 1)
@@ -149,16 +167,33 @@ def plot(fname):
             ax.axhspan(lo, hi, color="0.92", zorder=0)
         C, groups, _, _ = fhs(p, q, 16, 8 * q)
         Ci = np.rint(C).astype(int)
+        ksf, Ef, Xf = sweep(L, b, 4000)
         for idx, (r, Er) in enumerate(gap_centres(p, q)):
-            ax.text(2 * np.pi * 1.01, Er, rf"$\sum C={Ci[:idx+1].sum():+d}$",
-                    fontsize=8, va="center")
+            ax.axhline(Er, color="0.5", lw=0.6, ls=":", zorder=1)
+            for (kc, sgn, edge) in crossings(ksf, Ef, Xf, Er):
+                ax.plot(kc, Er, "^" if sgn > 0 else "v", ms=7, mec="k", mew=0.6,
+                        color=cL if edge == "L" else cR, zorder=5)
+            nL, nR = flow(ksf, Ef, Xf, Er)
+            ax.text(2 * np.pi * 1.015, Er,
+                    rf"$\sum C={Ci[:idx+1].sum():+d}$" + "\n" + rf"$N_L={nL:+d}$",
+                    fontsize=8, va="center", linespacing=1.1)
         ax.set_xlim(0, 2 * np.pi)
         ax.set_xticks([0, np.pi / 2, np.pi, 3 * np.pi / 2, 2 * np.pi])
         ax.set_xticklabels(["0", r"$\pi/2$", r"$\pi$", r"$3\pi/2$", r"$2\pi$"])
-        ax.set_xlabel(r"$k$"); ax.set_ylabel(r"$\varepsilon$")
-        ax.set_title(rf"$b={p}/{q}$, open chain $L={L}$", fontsize=10)
-    cb = fig.colorbar(sc, ax=axs, shrink=0.85)
-    cb.set_label(r"centre of mass $\langle l\rangle/(L-1)$  (0: left edge, 1: right edge)")
+        ax.set_xlabel(r"$k$ (one full period)"); ax.set_ylabel(r"$\varepsilon$")
+        ax.set_title(rf"({tag}) $b={p}/{q}$, open chain of $L={L}$ sites", fontsize=10)
+    handles = [Line2D([], [], color="0.85", lw=6, label="bulk bands (grey strips)"),
+               Line2D([], [], color=cL, lw=2.5, label="state on left edge"),
+               Line2D([], [], color=cR, lw=2.5, label="state on right edge"),
+               Line2D([], [], ls="", marker="^", mec="k", mfc="w", ms=7,
+                      label=r"crosses gap centre upward ($+1$)"),
+               Line2D([], [], ls="", marker="v", mec="k", mfc="w", ms=7,
+                      label=r"crosses gap centre downward ($-1$)")]
+    fig.legend(handles=handles, loc="outside lower center", ncol=5, fontsize=8, frameon=False)
+    cb = fig.colorbar(sc, ax=axs, shrink=0.8)
+    cb.set_label(r"position of the state $\langle l\rangle/(L-1)$ (0: left, 1: right)")
+    fig.suptitle(r"Spectral flow: in every gap the net number of left-edge crossings per period, "
+                 r"$N_L$, equals $\sum_{j\leq r}C_j$", fontsize=10.5)
     fig.savefig(fname, dpi=300)
     plt.close(fig)
     print("saved", fname)

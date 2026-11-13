@@ -153,28 +153,42 @@ def landau_uniformity():
 
 
 def plot_curvature(p, q, fname, N1=60, N2f=24):
+    """Berry curvature Omega(k) of every subband (or touching group) over the magnetic BZ.
+    Each panel has its own symmetric colour scale (white = 0). Dashed lines mark the
+    k_y-period 2pi/q of the pattern (magnetic translations)."""
     N2 = N2f * q
     C, groups, Fs, E = fhs(p, q, N1, N2)
     dkx = 2 * np.pi / q / N1
     dky = 2 * np.pi / N2
     ng = len(groups)
-    fig, axs = plt.subplots(1, ng, figsize=(2.6 * ng + 0.6, 3.0), constrained_layout=True)
+    fig, axs = plt.subplots(1, ng, figsize=(2.75 * ng + 0.4, 3.5), constrained_layout=True)
     for a, (g, F, c) in enumerate(zip(groups, Fs, C)):
+        ax = axs[a]
         Fp = F / (dkx * dky)
         vmax = np.abs(Fp).max()
-        im = axs[a].imshow(Fp.T, origin="lower", aspect="auto", cmap="RdBu_r",
-                           vmin=-vmax, vmax=vmax,
-                           extent=[0, 2 * np.pi / q, 0, 2 * np.pi])
-        axs[a].set_title(f"band {g[0]+1}" + (f"+{g[1]+1}" if len(g) > 1 else "")
-                         + f",  $C={int(np.rint(c)):+d}$", fontsize=10)
-        axs[a].set_xlabel(r"$k_x$")
-        axs[a].set_xticks([0, 2 * np.pi / q]); axs[a].set_xticklabels(["0", rf"$2\pi/{q}$"])
-        axs[a].set_yticks([0, np.pi, 2 * np.pi]); axs[a].set_yticklabels(["0", r"$\pi$", r"$2\pi$"])
-        cb = fig.colorbar(im, ax=axs[a], shrink=0.85)
+        im = ax.imshow(Fp.T, origin="lower", aspect="auto", cmap="RdBu_r",
+                       vmin=-vmax, vmax=vmax, extent=[0, 2 * np.pi / q, 0, 2 * np.pi])
+        for j in range(1, q):                                  # k_y-period 2pi/q
+            ax.axhline(2 * np.pi * j / q, color="k", lw=0.6, ls="--", alpha=0.5)
+        lab = f"band {g[0]+1}" + (f"+{g[1]+1}" if len(g) > 1 else "")
+        ax.set_title(lab + rf",  $C={int(np.rint(c)):+d}$", fontsize=11)
+        ax.text(0.03, 0.03, rf"$\Omega\in[{Fp.min():.2g},\,{Fp.max():.2g}]$",
+                transform=ax.transAxes, fontsize=8,
+                bbox=dict(facecolor="white", alpha=0.85, edgecolor="none", pad=1.5))
+        ax.set_xlabel(r"$k_x$", fontsize=10)
+        ax.set_xticks([0, 2 * np.pi / q]); ax.set_xticklabels(["0", rf"$2\pi/{q}$"])
+        yt = [2 * np.pi * j / q for j in range(q + 1)]
+        ax.set_yticks(yt)
+        ax.set_yticklabels(["0"] + [rf"${2*j}\pi/{q}$" if (2*j) % q else rf"${2*j//q}\pi$".replace("$1\\pi", "$\\pi")
+                                    for j in range(1, q + 1)], fontsize=8)
+        cb = fig.colorbar(im, ax=ax, shrink=0.85)
         cb.ax.tick_params(labelsize=7)
-    axs[0].set_ylabel(r"$k_y$")
-    fig.suptitle(rf"Berry curvature $\mathcal{{F}}_{{xy}}(\mathbf{{k}})$, $b={p}/{q}$ "
-                 rf"(FHS grid ${N1}\times{N2}$)", fontsize=11)
+        if a == ng - 1:
+            cb.set_label(r"Berry curvature $\Omega$ ($a^2$)", fontsize=9)
+    axs[0].set_ylabel(r"$k_y$", fontsize=10)
+    fig.suptitle(rf"Berry curvature $\Omega(\mathbf{{k}})$ of the {q} subbands at $b={p}/{q}$; "
+                 rf"$C=\frac{{1}}{{2\pi}}\int\Omega\,d^2k$; dashed lines: period $2\pi/{q}$ in $k_y$",
+                 fontsize=10.5)
     fig.savefig(fname, dpi=300)
     plt.close(fig)
     print("saved", fname)
@@ -210,14 +224,33 @@ def colored_butterfly(qmax=24, fname=None):
                 if e2 - e1 > 1e-6:
                     ax.plot([e1, e2], [b, b], color=cmap(norm(np.clip(acc, -tmax, tmax))),
                             lw=1.6 if q < 10 else 1.0, solid_capstyle="butt")
+    # print the integer inside the widest gaps of a few representative fluxes
+    for (p, q) in [(1, 10), (1, 6), (2, 9), (5, 13)]:
+        for (pp, qq) in [(p, q), (q - p, q)]:
+            C, groups, _, _ = fhs(pp, qq, 12, 6 * qq)
+            Ci = np.rint(C).astype(int)
+            e0 = np.linalg.eigvalsh(H_grid(pp, qq, np.array([0.]), np.array([0.]))[0, 0])
+            e1 = np.linalg.eigvalsh(H_grid(pp, qq, np.array([np.pi]), np.array([np.pi / qq]))[0, 0])
+            lo, hi = np.minimum(e0, e1), np.maximum(e0, e1)
+            acc, filled = 0, 0
+            for g, c in zip(groups[:-1], Ci[:-1]):
+                filled += len(g); acc += c
+                ga, gb = hi[filled - 1], lo[filled]
+                if gb - ga > 0.45:
+                    ax.text(0.5 * (ga + gb), pp / qq, f"{acc:+d}", ha="center", va="center",
+                            fontsize=7.5, fontweight="bold",
+                            bbox=dict(facecolor="white", edgecolor="0.4", lw=0.4, pad=0.8,
+                                      boxstyle="round,pad=0.15"))
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     cb = fig.colorbar(sm, ax=ax, ticks=range(-tmax, tmax + 1), shrink=0.9)
-    cb.set_label(r"$\sigma_{xy}/(e^2/h)=\sum_{j\leq r}C_j$ in the gap")
+    cb.set_label(r"gap Chern number $\Sigma_{j\leq r}C_j=\sigma_{xy}/(e^2/h)$"
+                 "\n" r"(values beyond $\pm6$ drawn as $\pm6$)", fontsize=9)
     ax.set_xlim(-4.1, 4.1); ax.set_ylim(0, 1)
     ax.set_xlabel(r"energy $\varepsilon$ (units of $|t|$)")
     ax.set_ylabel(r"flux per plaquette $b=p/q$")
-    ax.set_title(rf"Hofstadter butterfly with gaps coloured by Chern number, $q\leq{qmax}$",
-                 fontsize=10)
+    ax.set_title(rf"Butterfly as a phase diagram: black = subbands, colour = gaps ($q\leq{qmax}$)"
+                 "\n" r"each gap carries one integer $\Sigma_{j\leq r}C_j$ (boxed: examples)",
+                 fontsize=9.5)
     fig.tight_layout()
     fig.savefig(fname, dpi=300)
     plt.close(fig)

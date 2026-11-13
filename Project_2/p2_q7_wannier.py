@@ -219,42 +219,54 @@ def disorder_scan(p=1, q=3, r=1, M=12, Ws=np.linspace(0, 4, 17), nreal=20, seed=
 
 
 def plot(rows, fname):
-    fig, axs = plt.subplots(1, 3, figsize=(12.5, 3.9), constrained_layout=True)
+    fig, axs = plt.subplots(1, 3, figsize=(13.5, 4.3), constrained_layout=True)
     cols = ["#2a6fbb", "#d1495b", "#3a9e5c", "#e0a030", "#7a5195"]
     # (a) b = 1/3, all bands
     p, q = 1, 3
     ky, xb = wilson_centres(lambda th, k: H_grid(p, q, th, k), q, band_groups(p, q), 48, 300)
     C, _, _, _ = fhs(p, q, 16, 8 * q)
     for n in range(q):
+        c = int(np.rint(C[n]))
         axs[0].plot(ky, xb[n][:, 0], ".", ms=1.6, color=cols[n],
-                    label=rf"band {n+1}, $C={int(np.rint(C[n])):+d}$")
-    axs[0].set_title(r"(a) hybrid Wannier centres, $b=1/3$", fontsize=10)
+                    label=rf"band {n+1}: moves ${-c:+d}$ cell{'s' if abs(c) > 1 else ''} $\Rightarrow C={c:+d}$")
+    axs[0].set_title(r"(a) hybrid Wannier centres, $b=1/3$" "\n"
+                     r"($\bar x$ periodic mod $q=3$: top edge $\equiv$ bottom edge)", fontsize=9.5)
     axs[0].set_ylabel(r"$\bar x(k_y)$ (sites)"); axs[0].set_ylim(0, q)
-    axs[0].legend(fontsize=7.5, loc="upper center", markerscale=5, frameon=False, ncol=3,
+    axs[0].legend(fontsize=7.5, loc="upper center", markerscale=5, frameon=False, ncol=1,
                   bbox_to_anchor=(0.5, -0.17))
     # (b) b = 2/5, lowest two bands
     p, q = 2, 5
     ky, xb = wilson_centres(lambda th, k: H_grid(p, q, th, k), q, [[0], [1]], 48, 400)
     C, _, _, _ = fhs(p, q, 16, 8 * q)
     for n in range(2):
+        c = int(np.rint(C[n]))
         axs[1].plot(ky, xb[n][:, 0], ".", ms=1.4, color=cols[n],
-                    label=rf"band {n+1}, $C={int(np.rint(C[n])):+d}$")
-    axs[1].set_title(r"(b) hybrid Wannier centres, $b=2/5$", fontsize=10)
+                    label=rf"band {n+1}: moves ${-c:+d}$ cells $\Rightarrow C={c:+d}$")
+    axs[1].set_title(r"(b) hybrid Wannier centres, $b=2/5$, bands 1, 2" "\n"
+                     r"(rule: shift per period $=-C$ cells of $q$ sites)", fontsize=9.5)
     axs[1].set_ylabel(r"$\bar x(k_y)$ (sites)"); axs[1].set_ylim(0, q)
-    axs[1].legend(fontsize=7.5, loc="upper center", markerscale=5, frameon=False, ncol=2,
+    axs[1].legend(fontsize=7.5, loc="upper center", markerscale=5, frameon=False, ncol=1,
                   bbox_to_anchor=(0.5, -0.17))
     for ax in axs[:2]:
         ax.set_xlim(0, 2 * np.pi); ax.set_xlabel(r"$k_y$")
         ax.set_xticks([0, np.pi, 2 * np.pi]); ax.set_xticklabels(["0", r"$\pi$", r"$2\pi$"])
     # (c) disorder
     W, frac, fnan, gmed, gmin = rows.T
-    axs[2].plot(W, frac, "o-", color=cols[0], ms=4, label=r"fraction with winding $=+1$ ($=-C$)")
+    axs[2].plot(W, frac, "o-", color=cols[0], ms=4, label=r"fraction of samples with winding $=+1$ ($=-C$, quantised)")
     ax2 = axs[2]
-    ax2.plot(W, gmed / gmed[0], "s--", color=cols[1], ms=3.5, label="median gap / clean gap")
+    ax2.plot(W, gmed / gmed[0], "s--", color=cols[1], ms=3.5, label="median finite-size gap / clean gap (1.27)")
     ax2.set_xlabel(r"disorder strength $W$ (units of $|t|$)")
-    ax2.set_ylim(-0.05, 1.08)
-    ax2.set_title(r"(c) real-space winding, $b=1/3$, lowest gap, $L=36$", fontsize=10)
-    ax2.legend(fontsize=7.5, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=2)
+    ax2.set_ylabel("fraction of samples  /  normalised gap")
+    ax2.set_ylim(-0.05, 1.12)
+    Wq = W[frac == 1].max()                                   # all samples still +1
+    ax2.axvspan(-0.1, Wq + 0.1, color="#3a9e5c", alpha=0.10, zorder=0)
+    ax2.text(0.62, 0.08, f"all 20 samples:\nwinding $=+1$\n($W\\leq{Wq:g}$)", ha="center",
+             fontsize=8, color="#2b7a45", bbox=dict(facecolor="white", edgecolor="none", pad=1))
+    ax2.text(Wq + 0.25, 1.05, "gap closes in\nsome samples", fontsize=8, color="0.3", va="top")
+    ax2.set_xlim(-0.1, W.max() + 0.1)
+    ax2.set_title(r"(c) real-space winding, column disorder" "\n"
+                  r"$b=1/3$, lowest gap ($C=-1$), $L=36$, 20 samples/$W$", fontsize=9.5)
+    ax2.legend(fontsize=7.5, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=1)
     fig.savefig(fname, dpi=300)
     plt.close(fig)
     print("saved", fname)
